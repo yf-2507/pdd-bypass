@@ -31,6 +31,7 @@ jobs:
       - name: Prepare kernel headers
         run: |
           export PATH=$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin:$PATH
+export PYTHON=python2
           cd kernel_src
           make ARCH=arm64 CROSS_COMPILE=aarch64-linux-android- olddefconfig
           make ARCH=arm64 CROSS_COMPILE=aarch64-linux-android- prepare
@@ -39,6 +40,7 @@ jobs:
       - name: Build module
         run: |
           export PATH=$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin:$PATH
+export PYTHON=python2
           make -C kernel_src M=$PWD ARCH=arm64 CROSS_COMPILE=aarch64-linux-android- modules
 
       - name: Upload artifact
