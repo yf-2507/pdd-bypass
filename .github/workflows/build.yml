@@ -17,21 +17,17 @@ jobs:
           git clone --depth=1 --branch alioth-r-oss \
             https://github.com/MiCode/Xiaomi_Kernel_OpenSource.git kernel_src
 
-      - name: Nuke Python 2 scripts
+      - name: Replace gcc-wrapper.py with shell passthru
         run: |
-          cat > kernel_src/scripts/gcc-wrapper.py << 'PYEOF'
-#!/usr/bin/env python3
-import sys, os
-if len(sys.argv) > 1:
-    os.execvp(sys.argv[1], sys.argv[1:])
-PYEOF
+          rm -f kernel_src/scripts/gcc-wrapper.py
+          printf '#!/bin/sh\nexec "$@"\n' > kernel_src/scripts/gcc-wrapper.py
           chmod +x kernel_src/scripts/gcc-wrapper.py
+          head -3 kernel_src/scripts/gcc-wrapper.py
 
       - name: Copy config + disable modversions
         run: |
           cp config kernel_src/.config
           sed -i "s/CONFIG_MODVERSIONS=y/# CONFIG_MODVERSIONS is not set/" kernel_src/.config
-          sed -i "s/CONFIG_MODULE_SIG=y/# CONFIG_MODULE_SIG is not set/" kernel_src/.config 2>/dev/null || true
 
       - name: Setup Android NDK
         run: |
