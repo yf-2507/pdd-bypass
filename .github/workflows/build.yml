@@ -12,10 +12,10 @@ jobs:
       - name: Checkout module code
         uses: actions/checkout@v4
 
-      - name: Clone Xiaomi kernel source
+      - name: Clone Android Common Kernel (4.19)
         run: |
-          git clone --depth=1 --branch alioth-r-oss \
-            https://github.com/MiCode/Xiaomi_Kernel_OpenSource.git kernel_src
+          git clone --depth=1 --branch android-4.19 \
+            https://android.googlesource.com/kernel/common kernel_src
 
       - name: Copy config + disable modversions
         run: |
@@ -28,20 +28,14 @@ jobs:
           unzip -q android-ndk-r21e-linux-x86_64.zip
           echo "NDK=$PWD/android-ndk-r21e" >> $GITHUB_ENV
 
-      - name: Prepare kernel (bypass gcc-wrapper)
-        env:
-          CC: gcc
-          HOSTCC: gcc
-          CROSS_COMPILE: aarch64-linux-android-
-        run: |
-          cd kernel_src
-          make ARCH=arm64 olddefconfig
-          make ARCH=arm64 prepare
-          make ARCH=arm64 modules_prepare
-
-      - name: Build module
+      - name: Prepare kernel + build module
         run: |
           export PATH=$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin:$PATH
+          cd kernel_src
+          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-android- olddefconfig
+          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-android- prepare
+          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-android- modules_prepare
+          cd ..
           make -C kernel_src M=$PWD ARCH=arm64 CROSS_COMPILE=aarch64-linux-android- modules
 
       - name: Upload artifact
