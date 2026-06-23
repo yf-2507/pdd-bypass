@@ -17,13 +17,6 @@ jobs:
           git clone --depth=1 --branch alioth-r-oss \
             https://github.com/MiCode/Xiaomi_Kernel_OpenSource.git kernel_src
 
-      - name: Replace gcc-wrapper.py with shell passthru
-        run: |
-          rm -f kernel_src/scripts/gcc-wrapper.py
-          printf '#!/bin/sh\nexec "$@"\n' > kernel_src/scripts/gcc-wrapper.py
-          chmod +x kernel_src/scripts/gcc-wrapper.py
-          head -3 kernel_src/scripts/gcc-wrapper.py
-
       - name: Copy config + disable modversions
         run: |
           cp config kernel_src/.config
@@ -35,13 +28,16 @@ jobs:
           unzip -q android-ndk-r21e-linux-x86_64.zip
           echo "NDK=$PWD/android-ndk-r21e" >> $GITHUB_ENV
 
-      - name: Prepare kernel
+      - name: Prepare kernel (bypass gcc-wrapper)
+        env:
+          CC: gcc
+          HOSTCC: gcc
+          CROSS_COMPILE: aarch64-linux-android-
         run: |
-          export PATH=$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin:$PATH
           cd kernel_src
-          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-android- olddefconfig
-          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-android- prepare
-          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-android- modules_prepare
+          make ARCH=arm64 olddefconfig
+          make ARCH=arm64 prepare
+          make ARCH=arm64 modules_prepare
 
       - name: Build module
         run: |
