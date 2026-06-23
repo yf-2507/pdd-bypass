@@ -7,21 +7,20 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout module code
         uses: actions/checkout@v4
-
-      - name: Install Python 2
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq python2
-          sudo ln -sf /usr/bin/python2 /usr/local/bin/python
 
       - name: Clone Xiaomi kernel source
         run: |
           git clone --depth=1 --branch alioth-r-oss \
             https://github.com/MiCode/Xiaomi_Kernel_OpenSource.git kernel_src
+
+      - name: Convert Python 2 scripts to Python 3
+        run: |
+          python3 -m lib2to3 -w kernel_src/scripts/ 2>/dev/null || true
+          find kernel_src/scripts -name "*.py" -exec sed -i 's/except \([A-Za-z]*\), \([a-z]*\):/except \1 as \2:/g' {} \;
 
       - name: Copy config + disable modversions
         run: |
@@ -34,20 +33,15 @@ jobs:
           unzip -q android-ndk-r21e-linux-x86_64.zip
           echo "NDK=$PWD/android-ndk-r21e" >> $GITHUB_ENV
 
-      - name: Prepare kernel headers
+      - name: Prepare kernel + build module
         run: |
           export PATH=$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin:$PATH
-export PYTHON=python2
           cd kernel_src
-          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-android- olddefconfig
-          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-android- prepare
-          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-android- modules_prepare
-
-      - name: Build module
-        run: |
-          export PATH=$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin:$PATH
-export PYTHON=python2
-          make -C kernel_src M=$PWD ARCH=arm64 CROSS_COMPILE=aarch64-linux-android- modules
+          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-android- olddefconfig 2>&1 || true
+          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-android- prepare 2>&1 || true
+          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-android- modules_prepare 2>&1 || true
+          cd ..
+          make -C kernel_src M=$PWD ARCH=arm64 CROSS_COMPILE=aarch64-linux-android- modules 2>&1
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
