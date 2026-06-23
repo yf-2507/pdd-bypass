@@ -17,15 +17,21 @@ jobs:
           git clone --depth=1 --branch alioth-r-oss \
             https://github.com/MiCode/Xiaomi_Kernel_OpenSource.git kernel_src
 
-      - name: Convert Python 2 scripts to Python 3
+      - name: Nuke Python 2 scripts
         run: |
-          python3 -m lib2to3 -w kernel_src/scripts/ 2>/dev/null || true
-          find kernel_src/scripts -name "*.py" -exec sed -i 's/except \([A-Za-z]*\), \([a-z]*\):/except \1 as \2:/g' {} \;
+          cat > kernel_src/scripts/gcc-wrapper.py << 'PYEOF'
+#!/usr/bin/env python3
+import sys, os
+if len(sys.argv) > 1:
+    os.execvp(sys.argv[1], sys.argv[1:])
+PYEOF
+          chmod +x kernel_src/scripts/gcc-wrapper.py
 
       - name: Copy config + disable modversions
         run: |
           cp config kernel_src/.config
           sed -i "s/CONFIG_MODVERSIONS=y/# CONFIG_MODVERSIONS is not set/" kernel_src/.config
+          sed -i "s/CONFIG_MODULE_SIG=y/# CONFIG_MODULE_SIG is not set/" kernel_src/.config 2>/dev/null || true
 
       - name: Setup Android NDK
         run: |
@@ -33,15 +39,18 @@ jobs:
           unzip -q android-ndk-r21e-linux-x86_64.zip
           echo "NDK=$PWD/android-ndk-r21e" >> $GITHUB_ENV
 
-      - name: Prepare kernel + build module
+      - name: Prepare kernel
         run: |
           export PATH=$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin:$PATH
           cd kernel_src
-          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-android- olddefconfig 2>&1 || true
-          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-android- prepare 2>&1 || true
-          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-android- modules_prepare 2>&1 || true
-          cd ..
-          make -C kernel_src M=$PWD ARCH=arm64 CROSS_COMPILE=aarch64-linux-android- modules 2>&1
+          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-android- olddefconfig
+          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-android- prepare
+          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-android- modules_prepare
+
+      - name: Build module
+        run: |
+          export PATH=$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin:$PATH
+          make -C kernel_src M=$PWD ARCH=arm64 CROSS_COMPILE=aarch64-linux-android- modules
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
