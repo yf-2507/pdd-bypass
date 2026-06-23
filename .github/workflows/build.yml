@@ -1,0 +1,48 @@
+name: Build pdd_bypass kernel module
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout module code
+        uses: actions/checkout@v4
+
+      - name: Clone Xiaomi kernel source
+        run: |
+          git clone --depth=1 --branch alioth-r-oss \
+            https://github.com/MiCode/Xiaomi_Kernel_OpenSource.git kernel_src
+
+      - name: Copy config + disable modversions
+        run: |
+          cp config kernel_src/.config
+          sed -i "s/CONFIG_MODVERSIONS=y/# CONFIG_MODVERSIONS is not set/" kernel_src/.config
+
+      - name: Setup Android NDK
+        run: |
+          wget -q https://dl.google.com/android/repository/android-ndk-r21e-linux-x86_64.zip
+          unzip -q android-ndk-r21e-linux-x86_64.zip
+          echo "NDK=$PWD/android-ndk-r21e" >> $GITHUB_ENV
+
+      - name: Prepare kernel headers
+        run: |
+          export PATH=$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin:$PATH
+          cd kernel_src
+          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-android- olddefconfig
+          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-android- prepare
+          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-android- modules_prepare
+
+      - name: Build module
+        run: |
+          export PATH=$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin:$PATH
+          make -C kernel_src M=$PWD ARCH=arm64 CROSS_COMPILE=aarch64-linux-android- modules
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pdd_bypass
+          path: pdd_bypass.ko
