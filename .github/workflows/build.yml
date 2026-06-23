@@ -12,6 +12,12 @@ jobs:
       - name: Checkout module code
         uses: actions/checkout@v4
 
+      - name: Install Python 2
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq python2
+          sudo ln -sf /usr/bin/python2 /usr/local/bin/python
+
       - name: Clone Xiaomi kernel source
         run: |
           git clone --depth=1 --branch alioth-r-oss \
